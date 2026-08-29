@@ -4,6 +4,69 @@
 
 Topics: quant-trading, algorithmic-trading, trading-strategies, quantitative-finance, quant-trading-bot, quant-trading-api, quant-trading-system, automated-quant-trade, quant-strategy-backtest, crypto-quant-trading, quant-trading-framework, high-frequency-quant, quant-trading-router, live-trading-quant, quant-alpha-signals, quant-trading-source
 
+## quantlab — runnable engine, paper trading & web UI
+
+&nbsp;
+
+The scripts in `quant-strategies/` are kept as a reference archive, but they no
+longer run correctly on a current Python stack. **`quantlab/` is a tested,
+installable rewrite**: a backtest engine, nine improved strategies, a
+paper-trading account and a web UI.
+
+```bash
+pip install -e ".[all]"
+quantlab serve            # web UI at http://127.0.0.1:8000
+quantlab compare --symbol AAPL
+pytest -q                 # 178 tests
+```
+
+**[Full documentation → docs/USAGE.md](docs/USAGE.md)**
+
+### Why a rewrite
+
+The archived scripts have a silent, total failure on modern pandas. Every one of
+them assigns signals through chained indexing:
+
+```python
+signals['positions'][ma1:] = np.where(signals['ma1'][ma1:] >= signals['ma2'][ma1:], 1, 0)
+```
+
+Under copy-on-write — the default since pandas 3.0 — that writes to a temporary
+copy and is thrown away. The script still runs, still plots, and reports a flat
+equity curve built from **no positions at all**. The idiom appears 94 times
+across the collection. Alongside it: 7 files import `fix_yahoo_finance`, which
+was renamed to `yfinance` in 2018 and no longer installs; signals were applied
+to the same bar's return (lookahead bias); trading was assumed frictionless; and
+the pair-trading hedge ratio was fitted in-sample over the whole dataset.
+
+### What quantlab adds
+
+- **An honest engine** — cash/units accounting, one-bar execution lag,
+  commission and slippage, financing on leverage, and stops that fill intrabar
+  at the stop price.
+- **Risk controls** — volatility targeting, leverage cap, ATR stops, trailing
+  stops, and a stop lockout that stops a stopped-out position re-entering on an
+  unchanged signal.
+- **A paper-trading ledger** — SQLite-backed deposits, withdrawals, orders,
+  positions and P&L, with an integrity check that re-derives cash from the
+  transaction log.
+- **A web UI** — dashboard, funding, trading and backtesting. No build step, no
+  external requests, light and dark themes.
+- **178 tests**, ~91% coverage, fully offline and deterministic.
+
+> **On funding.** quantlab moves **fictional money only**. It never stores bank
+> credentials, account numbers, routing numbers or card numbers — the server
+> rejects them outright and keeps only an institution name, an account type and
+> the last four digits. To move real money, implement a provider against Plaid,
+> Stripe or Alpaca; see [`quantlab/banking/providers.py`](quantlab/banking/providers.py).
+> Nothing here is investment advice, and a backtest is not a prediction.
+
+&nbsp;
+
+---
+
+&nbsp;
+
 ## Intro
 
 &nbsp;

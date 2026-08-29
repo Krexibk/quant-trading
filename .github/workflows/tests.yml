@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  push:
+    paths: ['quantlab/**', 'tests/**', 'pyproject.toml', '.github/workflows/tests.yml']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[web,dev]"
+
+      - name: Lint
+        run: ruff check quantlab tests
+        continue-on-error: true
+
+      - name: Test
+        # The suite is fully deterministic and must not reach the network.
+        env:
+          QUANTLAB_ALLOW_NETWORK: '0'
+        run: pytest -q --cov=quantlab --cov-report=term-missing
