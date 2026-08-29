@@ -1,0 +1,17 @@
+# Core (required)
+pandas>=2.0
+numpy>=1.24
+
+# Web UI and API  -- python -m quantlab.cli serve
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+
+# Live market data (optional; quantlab falls back to its offline generator)
+# NOTE: the original scripts imported `fix_yahoo_finance`, which was renamed
+# to `yfinance` in 2018 and no longer installs.
+yfinance>=0.2.40
+
+# Development
+pytest>=8.0
+httpx>=0.27

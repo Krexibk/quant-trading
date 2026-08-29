@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>quantlab — paper trading &amp; backtesting</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f8cff'/><path d='M7 21l5-7 4 4 8-11' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Q</div>
+      <div>
+        <div class="brand-name">quantlab</div>
+        <div class="brand-sub">Paper trading</div>
+      </div>
+    </div>
+    <button class="nav-item active" data-view="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" data-view="fund">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Funding
+    </button>
+    <button class="nav-item" data-view="trade">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-8"/><path d="M14 7h6v6"/></svg>
+      Trade
+    </button>
+    <button class="nav-item" data-view="research">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      Backtest
+    </button>
+    <button class="nav-item" data-view="activity">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      Activity
+    </button>
+    <div class="nav-spacer"></div>
+    <button class="nav-item" id="theme-toggle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+      <span id="theme-label">Light mode</span>
+    </button>
+  </nav>
+
+  <main class="main">
+    <!-- ============================================ DASHBOARD -->
+    <section id="view-dashboard">
+      <div class="page-head">
+        <div><h1>Dashboard</h1><p class="subtitle">Your paper trading account at a glance.</p></div>
+        <div class="btn-row"><button class="btn-sm" id="refresh-btn">Refresh</button></div>
+      </div>
+      <div class="notice notice-warn">
+        <span>⚠︎</span>
+        <div><b>This is a paper trading account.</b> All money here is fictional and settles instantly against a
+        built-in sandbox. No real funds move, and quantlab never stores bank credentials, account numbers or card
+        numbers — only an institution name, an account type and the last four digits.</div>
+      </div>
+      <div class="grid cols-4" id="stat-cards"></div>
+      <div class="grid cols-2" style="margin-top:14px">
+        <div class="card">
+          <h2>Holdings</h2>
+          <div id="positions-table"></div>
+        </div>
+        <div class="card">
+          <h2>Allocation</h2>
+          <div class="chart-wrap"><canvas id="alloc-chart" height="230"></canvas></div>
+          <div class="legend" id="alloc-legend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ FUNDING -->
+    <section id="view-fund" hidden>
+      <div class="page-head">
+        <div><h1>Funding</h1><p class="subtitle">Link a source and move money into the paper account.</p></div>
+      </div>
+      <div class="notice notice-info">
+        <span>🔒</span>
+        <div><b>What this form will and will not accept.</b> Enter only the <b>last four digits</b> of an account —
+        the server rejects a full account number, routing number or card number outright. That is not a limitation to
+        work around: handling those puts you in PCI-DSS and banking-regulation scope, and a local SQLite file is not a
+        safe place for them. To move real money, implement a provider against
+        <b>Plaid</b> (bank links), <b>Stripe</b> (cards/ACH) or <b>Alpaca</b> (brokerage) — see
+        <span class="mono">quantlab/banking/providers.py</span>. Those services hold the credentials; your server
+        only ever sees an opaque token.</div>
+      </div>
+      <div class="split">
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <h2>Link a funding source</h2>
+            <div class="field"><label for="f-nickname">Nickname</label>
+              <input id="f-nickname" placeholder="Main checking" maxlength="60"></div>
+            <div class="field"><label for="f-institution">Institution</label>
+              <input id="f-institution" placeholder="Chase" maxlength="80"></div>
+            <div class="field-row">
+              <div class="field"><label for="f-type">Account type</label>
+                <select id="f-type">
+                  <option value="checking">Checking</option>
+                  <option value="savings">Savings</option>
+                  <option value="brokerage">Brokerage</option>
+                  <option value="card">Card</option>
+                </select></div>
+              <div class="field"><label for="f-last4">Last 4 digits</label>
+                <input id="f-last4" placeholder="4321" maxlength="4" inputmode="numeric"></div>
+            </div>
+            <button class="btn-primary full" id="link-btn">Link account</button>
+            <p class="hint">Stored: nickname, institution, type, last 4. Nothing else.</p>
+          </div>
+          <div class="card">
+            <h2>Move money</h2>
+            <div class="field"><label for="f-account">From / to</label><select id="f-account"></select></div>
+            <div class="field"><label for="f-amount">Amount (USD)</label>
+              <input id="f-amount" type="number" min="1" step="100" value="25000"></div>
+            <div class="btn-row">
+              <button class="btn-buy" id="deposit-btn" style="flex:1">Deposit</button>
+              <button id="withdraw-btn" style="flex:1">Withdraw</button>
+            </div>
+            <p class="hint">Sandbox transfers settle immediately.</p>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <h2>Linked accounts</h2><div id="accounts-list"></div>
+          </div>
+          <div class="card">
+            <h2>Transfer history</h2><div id="transfers-table"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ TRADE -->
+    <section id="view-trade" hidden>
+      <div class="page-head">
+        <div><h1>Trade</h1><p class="subtitle">Place paper orders. The server prices every fill.</p></div>
+      </div>
+      <div class="split">
+        <div class="card">
+          <h2>New order</h2>
+          <div class="field"><label for="t-symbol">Symbol</label>
+            <input id="t-symbol" value="AAPL" maxlength="20" style="text-transform:uppercase"></div>
+          <div id="quote-box" class="card" style="background:var(--bg-elev-2);padding:13px;margin-bottom:13px">
+            <div class="dim" style="font-size:12px">Last price</div>
+            <div class="stat-value" id="quote-price" style="font-size:22px">—</div>
+            <div class="stat-sub" id="quote-change"></div>
+          </div>
+          <div class="field"><label>Side</label>
+            <div class="seg" id="side-seg">
+              <button data-side="buy" class="active buy">Buy</button>
+              <button data-side="sell">Sell</button>
+            </div></div>
+          <div class="field-row">
+            <div class="field"><label for="t-qty">Quantity</label>
+              <input id="t-qty" type="number" min="0.0001" step="1" value="10"></div>
+            <div class="field"><label for="t-type">Order type</label>
+              <select id="t-type"><option value="market">Market</option><option value="limit">Limit</option></select></div>
+          </div>
+          <div class="field" id="limit-field" hidden><label for="t-limit">Limit price</label>
+            <input id="t-limit" type="number" min="0.01" step="0.01"></div>
+          <div class="card" style="background:var(--bg-elev-2);padding:11px;margin-bottom:13px;font-size:12.5px">
+            <div style="display:flex;justify-content:space-between"><span class="dim">Estimated notional</span><span class="mono" id="est-notional">—</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px"><span class="dim">Commission (5 bps)</span><span class="mono" id="est-fee">—</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-weight:600"><span>Total</span><span class="mono" id="est-total">—</span></div>
+          </div>
+          <button class="btn-buy full" id="submit-order">Buy AAPL</button>
+          <p class="hint" id="buying-power"></p>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <h2 id="chart-title">Price</h2>
+            <div class="chart-wrap"><canvas id="price-chart" height="260"></canvas></div>
+          </div>
+          <div class="card"><h2>Holdings</h2><div id="trade-positions"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ BACKTEST -->
+    <section id="view-research" hidden>
+      <div class="page-head">
+        <div><h1>Backtest</h1><p class="subtitle">Test a strategy on historical prices before risking anything on it.</p></div>
+      </div>
+      <div class="split">
+        <div class="card">
+          <h2>Setup</h2>
+          <div class="field"><label for="b-strategy">Strategy</label><select id="b-strategy"></select></div>
+          <p class="hint" id="strategy-desc" style="margin-bottom:13px"></p>
+          <div class="field-row">
+            <div class="field"><label for="b-symbol">Symbol</label>
+              <input id="b-symbol" value="AAPL" style="text-transform:uppercase"></div>
+            <div class="field" id="symbol-b-field" hidden><label for="b-symbol-b">Second leg</label>
+              <input id="b-symbol-b" value="MSFT" style="text-transform:uppercase"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="b-start">Start</label><input id="b-start" type="date" value="2019-01-01"></div>
+            <div class="field"><label for="b-end">End</label><input id="b-end" type="date"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="b-capital">Capital</label><input id="b-capital" type="number" value="100000" step="1000"></div>
+            <div class="field"><label for="b-vol">Target vol</label><input id="b-vol" type="number" value="0.15" step="0.01" min="0" max="1"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="b-commission">Commission (bps)</label><input id="b-commission" type="number" value="1" step="0.5" min="0"></div>
+            <div class="field"><label for="b-slippage">Slippage (bps)</label><input id="b-slippage" type="number" value="2" step="0.5" min="0"></div>
+          </div>
+          <div class="field"><label for="b-stop">Stop loss (ATR multiples, 0 = off)</label>
+            <input id="b-stop" type="number" value="3" step="0.5" min="0"></div>
+          <details style="margin-bottom:13px">
+            <summary style="cursor:pointer;font-size:12.5px;color:var(--text-dim);padding:5px 0">Strategy parameters</summary>
+            <div class="params" id="strategy-params"></div>
+          </details>
+          <button class="btn-primary full" id="run-backtest">Run backtest</button>
+        </div>
+        <div id="backtest-results">
+          <div class="card"><div class="empty">Configure a strategy and run a backtest to see results.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ ACTIVITY -->
+    <section id="view-activity" hidden>
+      <div class="page-head">
+        <div><h1>Activity</h1><p class="subtitle">Every order and transfer, plus a ledger integrity check.</p></div>
+        <div class="btn-row">
+          <button class="btn-sm" id="integrity-btn">Verify ledger</button>
+          <button class="btn-sm" id="reset-btn">Reset account</button>
+        </div>
+      </div>
+      <div id="integrity-result"></div>
+      <div class="card" style="margin-bottom:14px"><h2>Orders</h2><div id="orders-table"></div></div>
+      <div class="card"><h2>Transfers</h2><div id="activity-transfers"></div></div>
+    </section>
+  </main>
+</div>
+<div id="toasts"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
